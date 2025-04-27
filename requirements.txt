@@ -1,0 +1,15 @@
+Flask==2.3.3
+Pillow==10.0.0
+numpy==1.24.0
+opencv-python-headless==4.8.1.78
+exif==1.6.0
+python-magic==0.4.27
+Werkzeug==2.3.7
+setuptools==68.2.2
+wheel==0.41.2
+torch==2.2.0
+torchvision==0.17.0
+scikit-learn==1.4.0
+matplotlib==3.8.2
+reportlab==4.0.8
+python-magic-bin==0.4.14; sys_platform == 'win32' 

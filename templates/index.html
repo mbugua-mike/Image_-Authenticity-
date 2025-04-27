@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Forgery Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .dashboard-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+            background: white;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        .upload-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #e9ecef;
+        }
+        .upload-area.dragover {
+            border-color: #0d6efd;
+            background-color: #e9ecef;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            display: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .suspicious {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .normal {
+            color: #198754;
+            font-weight: bold;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        .progress {
+            height: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .report-section {
+            background-color: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .stats-card {
+            background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+            color: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: transform 0.3s;
+        }
+        .stats-card:hover {
+            transform: scale(1.02);
+        }
+        .btn-report {
+            background: linear-gradient(45deg, #dc3545, #ff6b6b);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .btn-report:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+        }
+        .tooltip-inner {
+            max-width: 300px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+        }
+        .alert {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .table th {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .table td {
+            vertical-align: middle;
+        }
+        .help-text {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .result-card {
+            margin-bottom: 15px;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .result-card .card-header {
+            background: #f8f9fa;
+            border-bottom: none;
+            padding: 10px 15px;
+        }
+        .result-card .card-body {
+            padding: 15px;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 mb-3">Image Forgery Detection</h1>
+                <p class="lead">Upload an image to analyze for potential manipulation and forgery</p>
+                <p class="help-text">Supported formats: JPEG, PNG, TIFF (Max size: 16MB)</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Upload Section -->
+            <div class="col-md-6">
+                <div class="dashboard-card p-4">
+                    <h3 class="mb-4"><i class="bi bi-cloud-upload"></i> Upload Image</h3>
+                    <div class="upload-area" id="dropZone" data-bs-toggle="tooltip" data-bs-placement="top" 
+                         title="Drag and drop an image here or click to browse">
+                        <i class="bi bi-cloud-arrow-up display-4 mb-3"></i>
+                        <p class="mb-2">Drag and drop your image here</p>
+                        <p class="text-muted">or</p>
+                        <input type="file" id="fileInput" accept="image/*" class="d-none">
+                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            <i class="bi bi-folder2-open"></i> Browse Files
+                        </button>
+                    </div>
+                    <img id="previewImage" class="preview-image mt-3" alt="Preview">
+                </div>
+
+                <!-- Stats Section -->
+                <div class="dashboard-card p-4">
+                    <h3 class="mb-4"><i class="bi bi-graph-up"></i> Statistics</h3>
+                    <div id="stats">
+                        <div class="stats-card">
+                            <h5>Total Images Analyzed</h5>
+                            <h2 id="totalImages">0</h2>
+                        </div>
+                        <div class="stats-card">
+                            <h5>Potential Forgeries</h5>
+                            <h2 id="totalForgeries">0</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Results -->
+            <div class="col-md-6">
+                <div class="dashboard-card p-4 position-relative">
+                    <h3 class="mb-4"><i class="bi bi-search"></i> Analysis Results</h3>
+                    <div class="loading" id="loading">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <p>Analyzing image...</p>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="fileInfo" class="mb-4"></div>
+                    
+                    <div class="report-section">
+                        <div class="result-card">
+                            <div class="card-header">
+                                <h4 class="mb-0"><i class="bi bi-info-circle"></i> Metadata Analysis</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="metadataInfo"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <div class="card-header">
+                                <h4 class="mb-0"><i class="bi bi-shield-check"></i> Forgery Detection</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="forgeryInfo"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="result-card">
+                            <div class="card-header">
+                                <h4 class="mb-0"><i class="bi bi-lightbulb"></i> Recommendations</h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="recommendations"></div>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-report w-100" id="generateReport" data-bs-toggle="tooltip" 
+                                title="Generate a detailed PDF report of the analysis">
+                            <i class="bi bi-file-earmark-pdf"></i> Generate PDF Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewImage = document.getElementById('previewImage');
+        const loading = document.getElementById('loading');
+        const progressBar = document.querySelector('.progress-bar');
+        const fileInfoDiv = document.getElementById('fileInfo');
+        const metadataInfoDiv = document.getElementById('metadataInfo');
+        const forgeryInfoDiv = document.getElementById('forgeryInfo');
+        const recommendationsDiv = document.getElementById('recommendations');
+        const totalImagesSpan = document.getElementById('totalImages');
+        const totalForgeriesSpan = document.getElementById('totalForgeries');
+        const generateReportBtn = document.getElementById('generateReport');
+
+        let totalImages = 0;
+        let totalForgeries = 0;
+        let currentAnalysisResults = null;
+
+        // Drag and drop handlers
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            } else {
+                showError('Please upload an image file');
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        function showError(message) {
+            fileInfoDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> 
+                    ${message}
+                </div>`;
+            metadataInfoDiv.innerHTML = '';
+            forgeryInfoDiv.innerHTML = '';
+            recommendationsDiv.innerHTML = '';
+        }
+
+        function simulateProgress() {
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width >= 100) {
+                    clearInterval(interval);
+                } else {
+                    width += 5;
+                    progressBar.style.width = width + '%';
+                }
+            }, 200);
+        }
+
+        function handleFile(file) {
+            if (file.size > 16 * 1024 * 1024) {
+                showError('File size exceeds 16MB limit');
+                return;
+            }
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewImage.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            loading.style.display = 'block';
+            progressBar.style.width = '0%';
+            simulateProgress();
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Server error occurred');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                loading.style.display = 'none';
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                currentAnalysisResults = data;
+                displayResults(data);
+                updateStats();
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                showError(error.message || 'An error occurred during analysis');
+                console.error('Error:', error);
+            });
+        }
+
+        function displayResults(data) {
+            // File Information
+            fileInfoDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-file-image"></i> File Information</h5>
+                    <p><strong>Filename:</strong> ${data.filename}</p>
+                    <p><strong>Analysis Time:</strong> ${data.timestamp}</p>
+                </div>`;
+            
+            // Metadata Analysis
+            if (data.metadata.error) {
+                metadataInfoDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        Error analyzing metadata: ${data.metadata.error}
+                    </div>`;
+            } else {
+                metadataInfoDiv.innerHTML = data.metadata.has_exif ? `
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-info-circle"></i> EXIF Data Found</h5>
+                        <p><strong>Camera Make:</strong> ${data.metadata.make || 'Unknown'}</p>
+                        <p><strong>Camera Model:</strong> ${data.metadata.model || 'Unknown'}</p>
+                        <p><strong>Capture Date:</strong> ${data.metadata.datetime || 'Unknown'}</p>
+                        <p><strong>Software:</strong> ${data.metadata.software || 'Unknown'}</p>
+                    </div>` : 
+                    '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> No EXIF metadata found</div>';
+            }
+            
+            // Forgery Detection
+            if (data.forgery_detection.error) {
+                forgeryInfoDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        ${data.forgery_detection.error}
+                    </div>`;
+            } else {
+                const mlConfidence = data.forgery_detection.ml_confidence ? 
+                    (data.forgery_detection.ml_confidence * 100).toFixed(2) : 'N/A';
+                
+                const isSuspicious = data.forgery_detection.compression_artifacts || 
+                                   data.forgery_detection.suspicious_regions ||
+                                   (data.forgery_detection.ml_confidence && data.forgery_detection.ml_confidence > 0.7);
+                
+                forgeryInfoDiv.innerHTML = `
+                    <div class="alert ${isSuspicious ? 'alert-danger' : 'alert-success'}">
+                        <h5><i class="bi bi-shield-check"></i> Forgery Analysis</h5>
+                        ${data.forgery_detection.ml_confidence ? `
+                            <p><strong>ML Detection Confidence:</strong> 
+                                <span class="${data.forgery_detection.ml_confidence > 0.7 ? 'suspicious' : 'normal'}">
+                                    ${mlConfidence}%
+                                </span>
+                            </p>
+                        ` : ''}
+                        <p><strong>Compression Artifacts:</strong> 
+                            ${data.forgery_detection.compression_artifacts ? 
+                                '<span class="suspicious"><i class="bi bi-exclamation-circle"></i> Detected</span>' : 
+                                '<span class="normal"><i class="bi bi-check-circle"></i> None Found</span>'}
+                        </p>
+                        <p><strong>Suspicious Regions:</strong> 
+                            ${data.forgery_detection.suspicious_regions ? 
+                                '<span class="suspicious"><i class="bi bi-exclamation-circle"></i> Detected</span>' : 
+                                '<span class="normal"><i class="bi bi-check-circle"></i> None Found</span>'}
+                        </p>
+                        
+                        <h6>Analysis Details:</h6>
+                        <ul class="list-unstyled">
+                            <li>Compression Score: ${data.forgery_detection.analysis_details.compression_score.toFixed(4)}</li>
+                            <li>Cloning Score: ${data.forgery_detection.analysis_details.cloning_score}</li>
+                            ${data.forgery_detection.analysis_details.ml_probability ? 
+                                `<li>ML Probability: ${(data.forgery_detection.analysis_details.ml_probability * 100).toFixed(2)}%</li>` : ''}
+                        </ul>
+                    </div>`;
+                
+                if (isSuspicious) {
+                    totalForgeries++;
+                }
+            }
+            
+            // Region Analysis
+            if (data.region_analysis.error) {
+                regionInfoDiv.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        ${data.region_analysis.error}
+                    </div>`;
+            } else if (data.region_analysis.regions && data.region_analysis.regions.length > 0) {
+                const regionsHtml = data.region_analysis.regions.map(region => `
+                    <div class="region-item mb-3">
+                        <h6>Region ${region.region_id + 1}</h6>
+                        <p><strong>Position:</strong> (${region.position.x}, ${region.position.y})</p>
+                        <p><strong>Size:</strong> ${region.position.width}x${region.position.height}</p>
+                        <p><strong>Statistics:</strong></p>
+                        <ul>
+                            <li>Mean: ${region.statistics.mean.toFixed(2)}</li>
+                            <li>Standard Deviation: ${region.statistics.std.toFixed(2)}</li>
+                            <li>Entropy: ${region.statistics.entropy.toFixed(2)}</li>
+                        </ul>
+                    </div>
+                `).join('');
+                
+                regionInfoDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-grid"></i> Region Analysis</h5>
+                        ${regionsHtml}
+                    </div>`;
+            } else {
+                regionInfoDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No significant regions detected
+                    </div>`;
+            }
+            
+            // Generate recommendations
+            const recommendations = [];
+            
+            if (data.metadata.has_exif === false) {
+                recommendations.push('No EXIF data found, which could indicate image manipulation');
+            }
+            if (data.forgery_detection.compression_artifacts) {
+                recommendations.push('Multiple compression artifacts detected, suggesting possible image editing');
+            }
+            if (data.forgery_detection.suspicious_regions) {
+                recommendations.push('Suspicious regions detected, indicating potential cloning or manipulation');
+            }
+            if (data.forgery_detection.ml_confidence && data.forgery_detection.ml_confidence > 0.7) {
+                recommendations.push(`High probability (${mlConfidence}%) of image manipulation detected by ML model`);
+            }
+            
+            recommendationsDiv.innerHTML = recommendations.length > 0 ? 
+                `<div class="alert alert-warning">
+                    <h5><i class="bi bi-lightbulb"></i> Recommendations</h5>
+                    <ul class="mb-0">
+                        ${recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                    </ul>
+                </div>` :
+                '<div class="alert alert-success"><i class="bi bi-check-circle"></i> No suspicious activity detected</div>';
+        }
+
+        function updateStats() {
+            totalImages++;
+            totalImagesSpan.textContent = totalImages;
+            totalForgeriesSpan.textContent = totalForgeries;
+        }
+
+        generateReportBtn.addEventListener('click', async () => {
+            if (!currentAnalysisResults || !currentAnalysisResults.filename) {
+                alert('Please analyze an image first');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/generate_report/${currentAnalysisResults.filename}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `report_${currentAnalysisResults.filename.split('.')[0]}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || 'Error generating report');
+                }
+            } catch (error) {
+                alert('An error occurred while generating the report');
+            }
+        });
+    </script>
+</body>
+</html> 
